@@ -1,4 +1,4 @@
-import torch as torch
+import torch
 import numpy as np
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Dataset
@@ -38,21 +38,30 @@ class dataLoader():
     data loader class. Contains the datasets for style and contents. 
     If called, returns all the content images and one style image
     """
-    def __init__(self,config):
-        self.styleDataSet = imageDataSet(config.styles)
-        self.contentDataSet = imageDataSet(config.contents)
-        self.imsize = config.imageSize
+    def __init__(self,config = None):
+        if config == None:
+            self.styleDataSet = imageDataSet('styles')
+            self.contentDataSet = imageDataSet('contents')
+            self.imsize = 200
+            self.network = 'vgg19'
+
+        else:
+            self.styleDataSet = imageDataSet(config.styles)
+            self.contentDataSet = imageDataSet(config.contents)
+            self.imsize = config.imageSize
+            self.network = config.network
+        
         self.stylesIdx = 0
         self.contentsIdx = 0
+        print(f'There are {self.numOfContents()} contents to be rendered in {self.numOfStyles()} styles')
         self.finished = False
         trans = [transforms.Resize((self.imsize,self.imsize)), transforms.ToTensor()]
-        if 'vgg' in config.network:
-            trans.append(transforms.Normalize(mean=[0.48501961, 0.45795686, 0.40760392], std=[1,1,1]))
-        trans.append(lambda x: x.mul_(255))
+        trans.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
         self.transform = transforms.Compose(trans)
 
     def __call__(self):
         if not self.finished:
+            print(f'Getting style image {self.stylesIdx+1} and content image {self.contentsIdx+1}')
             stylePath = self.styleDataSet[self.stylesIdx]
             contPath = self.contentDataSet[self.contentsIdx]
 
@@ -63,12 +72,13 @@ class dataLoader():
             if (self.contentsIdx % len(self.contentDataSet) == 0):
                 self.stylesIdx += 1
 
-            if (self.stylesIdx % len(self.styleDataSet) == 0):
-                self.finished = True
+                if (self.stylesIdx % len(self.styleDataSet) == 0):
+                    self.finished = True
 
             return cont, style, contPath, stylePath
         
         else:
+            print('Finished!')
             return None
 
     def getTensorFrom_(self, path):

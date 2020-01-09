@@ -15,6 +15,8 @@ parser.add_argument('--outputFolder', type=str, default='./generated/')         
 #  Generator options
 ############################
 
+parser.add_argument('--keepColors',action='store_true')                     #Keep original colors of the content image
+
 parser.add_argument('--nLoops', type=int, default=500)                                                             # Number of training loops for the images
 parser.add_argument('--network', type=str, default='vgg19')                                                        # Which object detection network to use. Default is VGG19. Possible options are AlexNet, VGG16 and VGG19
 parser.add_argument('--contentLayers', type=str, default='relu_1')                                                 # Layer to use to calculate the content loss 

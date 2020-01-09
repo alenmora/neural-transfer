@@ -52,7 +52,6 @@ class generator:
 
         self.contentsLossModules = [] 
         self.stylesLossModules = []
-        self.showImages = self.showImagesPerContent if config.showImagesPer == 'Content' else self.showImagesPerStyle
 
         self.pooling = self.poolingDict[config.poolingStyle]
 
@@ -67,14 +66,13 @@ class generator:
 
         self.outputFolder = utils.createDir(config.outputFolder)
 
-        trans = [transforms.Lambda(lambda x: x.mul_(1/255.))]
-
-        if 'vgg' in config.network:
-            trans.append(transforms.Normalize(mean=[-0.48501961, -0.45795686, -0.40760392], std=[1,1,1]))
-
+        trans = [transforms.Normalize(mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225], std=[1/0.229, 1/0.224, 1/0.225])]
+        
         trans.append(transforms.Lambda(lambda x: x.clamp_(0,1)))
 
         self.trans = transforms.Compose(trans)
+
+        self.keepColors = config.keepColors
 
     def checkName(self, name, model, content, style):
         """
@@ -135,7 +133,11 @@ class generator:
         """
         Perform training for one content and style
         """
-        print(f'Training {contentN} to look like {styleN}...')
+
+        contentNs = self.getImageName(contentN)
+        styleNs = self.getImageName(styleN)
+
+        print(f'Training {contentNs} to look like {styleNs}...')
 
         inputImage = content.clone()
         if self.useWhiteNoise:
@@ -175,10 +177,10 @@ class generator:
                     print(f"Iteration {n[0]+1:5d}/{self.nLoops}; Style loss: {sloss:9.4f}; Contents loss: {closs:9.4f}; Total loss: {loss:9.4f}")
 
                 if self.saveSnapshotEvery > 0 and n[0] % self.saveSnapshotEvery == self.saveSnapshotEvery-1:
-                    filename = f'{contentN}_as_{styleN}_{n[0]+1}.png'
+                    filename = f'{contentNs}_as_{styleNs}_{n[0]+1}.png'
                     filename = os.path.join(self.outputFolder,filename)
                     output = inputImage.clone().detach().squeeze()
-                    utils.saveImage(self.trans(output), filename)
+                    utils.saveImage(self.trans(output), filename, original = contentN, keepColors = self.keepColors)
 
                 return loss
 
@@ -196,83 +198,26 @@ class generator:
 
         while group:
             content, style, contentN, styleN = group
-            contentN = contentN.split('/')[-1].split('.')[0]
-            styleN = styleN.split('/')[-1].split('.')[0]
-
+        
             self.train(content, style, contentN, styleN)
 
             group = self.dataLoader()
-        
-        #self.showImages()
 
         self.saveImages()
-
-    def showImages_(self, images, nrows = None, padding = 5):
-        """
-        Internal function to show a group of images in a grid
-        with nrows and a padding between images
-        """
-        if nrows == None:
-            n = images.size(0)
-            nrows = 1
-            if math.sqrt(n) == int(math.sqrt(n)):
-                nrows = math.sqrt(n)
-    
-            elif n > 5:
-                i = int(math.sqrt(n))
-                while i > 2:
-                    if (n % i) == 0:
-                        nrows = i
-                        break
-
-                    i = i-1
-        
-        grid = utils.makeImagesGrid(images, nrows, padding = padding)
-    
-        plt.imshow(grid.numpy().transpose(1,2,0))
-
-        plt.show(block=True)
-
-    def showImagesPerContent(self):
-        """
-        Show all the images generated, with each row
-        corresponding to the same content in different styles
-        """
-        imageList = []
-        for content in self.contents:
-            stylesList = []
-            for style in self.styles:
-                stylesList.append(self.genIm[style][content]) 
-
-            imageList.append(torch.stack(stylesList, dim=0))
-        
-        self.showImages_(imageList, nrows = len(self.contents))
-
-    def showImagesPerStyle(self):
-        """
-        Show all the images generated, with each row
-        corresponding to the style applied to different contents
-        """
-        imageList = []
-        for style in self.styles:
-            contentsList = []
-            for content in self.contents:
-                contentsList.append(self.genIm[style][content]) 
-
-            imageList.append(torch.stack(contentsList, dim=0))
-
-        self.showImages_(imageList, nrows = len(self.styles))
 
     def saveImages(self):
         """
         Save the generated images in the outputFolder,
         """
-        for style, dic in self.genIm.items():
-            for content, im in dic.items():
-                filename = f'{content}_as_{style}.jpg'
+        for styleN, dic in self.genIm.items():
+            for contentN, im in dic.items():
+                filename = f'{self.getImageName(contentN)}_as_{self.getImageName(styleN)}.jpg'
                 filename = os.path.join(self.outputFolder,filename)
-                utils.saveImage(im, filename) 
+                utils.saveImage(im, filename, original = content, keepColors = self.keepColors) 
 
+    def getImageName(self, imagePath):
+        return imagePath.split('/')[-1].split('.')[0]
+    
 if __name__ == "__main__":
     gen = generator(config)
     print('Generator instantiated. Proceeding to train...')
