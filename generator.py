@@ -58,10 +58,8 @@ class generator:
         self.gram = lossModules.GramMatrix().to(device = self.device)
 
         self.genIm = {}
-        self.styles = [s.split('/')[-1].split('.')[0] for s in self.dataLoader.styleDataSet()]
-        self.contents = [c.split('/')[-1].split('.')[0] for c in self.dataLoader.contentDataSet()]
 
-        for style in self.styles:
+        for style in self.dataLoader.styleDataSet():
             self.genIm[style] = {}
 
         self.outputFolder = utils.createDir(config.outputFolder)
@@ -84,7 +82,7 @@ class generator:
 
         if name in self.contentLayers:
             # add content loss:
-            target = model.forward(content).clone()
+            target = model.forward(content)
             content_loss = lossModules.ContentLoss(target, self.alpha)
             model.add_module(f"content_loss_layer_{i}", content_loss)
                     
@@ -92,7 +90,7 @@ class generator:
 
         if name in self.styleLayers:
             # add style loss:
-            target_feature = model.forward(style).clone()
+            target_feature = model.forward(style)
             target_feature_gram = self.gram.forward(target_feature)
             style_loss = lossModules.StyleLoss(target_feature_gram, self.beta)
             model.add_module(f"style_loss_layer_{i}", style_loss)
@@ -124,10 +122,10 @@ class generator:
                     name = "pool_" + str(i)
                     model.add_module(name, self.pooling(kernel_size=layer.kernel_size, stride=layer.stride, padding = layer.padding))
 
-        self.model = model
-
-        for param in self.model.parameters():
+        for param in model.parameters():
             param.requires_grad = False
+
+        return model
 
     def train(self, content, style, contentN, styleN):
         """
@@ -139,15 +137,15 @@ class generator:
 
         print(f'Training {contentNs} to look like {styleNs}...')
 
-        inputImage = content.clone()
+        inputImage = content.clone().to(self.device)
         if self.useWhiteNoise:
-            inputImage.data = torch.randn(inputImage.data.size(), device = self.device)
+            inputImage = torch.randn(inputImage.data.size(), device = self.device)
 
         inputImage.requires_grad_(True)
 
         optimizer = torch.optim.LBFGS([inputImage])
 
-        self.loadNeuralNetwork(content, style)
+        model = self.loadNeuralNetwork(content, style)
 
         n = [0]
 
@@ -156,7 +154,7 @@ class generator:
             def closure():
                 optimizer.zero_grad()
                 
-                self.model.forward(inputImage)
+                model.forward(inputImage)
             
                 closs = 0.
                 sloss = 0.

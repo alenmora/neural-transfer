@@ -35,3 +35,18 @@ def createDir(dir):
     except FileExistsError: 
         print(f'Using previously created folder {dir}')
     return dir
+
+def saveGif(dir):
+    """
+    Takes a group of images and saves them in a gif
+    """
+    paths = glob(os.path.join(dir, '*.jpg'))
+    paths = paths + glob(os.path.join(dir, '*.jpeg'))
+    paths = paths + glob(os.path.join(dir, '*.png'))
+
+    ims = []
+    name = '.gif'
+    for im in paths:
+        ims.append(Image.open(im))
+        name = ims[0].split('/')[0]+'/'+ims[0].split('/')[-1].split('.')[0]+ name
+    ims[0].save(name, save_all=True, append_images=ims[1:], duration=500,loop=1)

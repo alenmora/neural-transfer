@@ -3,7 +3,7 @@ from torch import nn
 
 class ContentLoss(nn.Module):
     """
-    Transparent (output = input) module inserted to be inserted after the 
+    Transparent (output = input) module to be inserted after the 
     content layer(s) in order to calculate the content loss
     """
     def __init__(self, target, weight):
@@ -18,8 +18,7 @@ class ContentLoss(nn.Module):
 
     def forward(self, input):
         self.loss = self.criterion.forward(input * self.weight, self.target)
-        self.output = input
-        return self.output
+        return input
 
     def getLoss(self):
         return self.loss
@@ -57,11 +56,10 @@ class StyleLoss(nn.Module):
         self.criterion = nn.MSELoss()
 
     def forward(self, input):
-        self.output = input.clone()
         self.G = self.gram.forward(input)
         self.G.mul_(self.weight)
         self.loss = self.criterion.forward(self.G, self.target)
-        return self.output
+        return input
 
     def getLoss(self):
         return self.loss
